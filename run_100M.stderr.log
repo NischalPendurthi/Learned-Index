@@ -1,0 +1,104 @@
+
+===== dense, N = 100000000 =====
+generating dataset...
+  100000000 unique sorted keys in 0.6 s  [min 0, max 99999999]
+building RMI K=1000...
+building RMI K=10000...
+building RMI K=100000...
+
+structure:
+  BTree page=32    size    24.611 MB   height 6   leaf pages 3125000
+  BTree page=64    size    12.110 MB   height 5   leaf pages 1562500
+  BTree page=128   size     6.007 MB   height 4   leaf pages 781250
+  BTree page=256   size     2.992 MB   height 4   leaf pages 390625
+  RMI   K=1000    size     0.023 MB   stage1 linear     avg |err|       0.00   avg window       1.00   max window 1
+  RMI   K=10000   size     0.229 MB   stage1 linear     avg |err|       0.00   avg window       1.00   max window 1
+  RMI   K=100000  size     2.289 MB   stage1 linear     avg |err|       0.00   avg window       1.00   max window 1
+
+correctness checks:
+  [ok]   BTree page=32           recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=64           recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=128          recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=256          recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=1000              recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=10000             recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=100000            recall 100%, 1000 absent keys -> -1
+
+benchmarking (1000000 lookups x 5 reps, median)...
+  BTree page=32    lookup  356.12 ns   traverse  170.30 ns
+  BTree page=64    lookup  377.73 ns   traverse  101.32 ns
+  BTree page=128   lookup  366.55 ns   traverse   79.57 ns
+  BTree page=256   lookup  358.06 ns   traverse   77.63 ns
+  RMI   K=1000    lookup   33.05 ns   model       3.76 ns
+  RMI   K=10000   lookup   33.27 ns   model       4.20 ns
+  RMI   K=100000  lookup   37.65 ns   model       5.22 ns
+
+===== lognormal, N = 100000000 =====
+generating dataset...
+  100000000 unique sorted keys in 18.7 s  [min 6772, max 633638362431]
+building RMI K=1000...
+building RMI K=10000...
+building RMI K=100000...
+
+structure:
+  BTree page=32    size    24.611 MB   height 6   leaf pages 3125000
+  BTree page=64    size    12.110 MB   height 5   leaf pages 1562500
+  BTree page=128   size     6.007 MB   height 4   leaf pages 781250
+  BTree page=256   size     2.992 MB   height 4   leaf pages 390625
+  RMI   K=1000    size     0.023 MB   stage1 loglinear  avg |err|   23448.99   avg window   92260.98   max window 2240722
+  RMI   K=10000   size     0.229 MB   stage1 loglinear  avg |err|   23062.44   avg window   90669.51   max window 2222538
+  RMI   K=100000  size     2.289 MB   stage1 linear     avg |err|     705.47   avg window    2916.13   max window 324201
+
+correctness checks:
+  [ok]   BTree page=32           recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=64           recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=128          recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=256          recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=1000              recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=10000             recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=100000            recall 100%, 1000 absent keys -> -1
+
+benchmarking (1000000 lookups x 5 reps, median)...
+  BTree page=32    lookup  350.05 ns   traverse  132.79 ns
+  BTree page=64    lookup  350.54 ns   traverse   96.91 ns
+  BTree page=128   lookup  377.06 ns   traverse   78.05 ns
+  BTree page=256   lookup  354.48 ns   traverse   74.79 ns
+  RMI   K=1000    lookup  335.50 ns   model      14.51 ns
+  RMI   K=10000   lookup  286.40 ns   model      14.92 ns
+  RMI   K=100000  lookup  196.47 ns   model       4.07 ns
+
+===== uniform_sparse, N = 100000000 =====
+generating dataset...
+  100000000 unique sorted keys in 15.1 s  [min 371645026762, max 9042551583882546066]
+building RMI K=1000...
+building RMI K=10000...
+building RMI K=100000...
+
+structure:
+  BTree page=32    size    24.611 MB   height 6   leaf pages 3125000
+  BTree page=64    size    12.110 MB   height 5   leaf pages 1562500
+  BTree page=128   size     6.007 MB   height 4   leaf pages 781250
+  BTree page=256   size     2.992 MB   height 4   leaf pages 390625
+  RMI   K=1000    size     0.023 MB   stage1 linear     avg |err|      64.29   avg window     374.84   max window 731
+  RMI   K=10000   size     0.229 MB   stage1 linear     avg |err|      20.41   avg window     119.12   max window 256
+  RMI   K=100000  size     2.289 MB   stage1 linear     avg |err|       6.45   avg window      37.36   max window 100
+
+correctness checks:
+  [ok]   BTree page=32           recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=64           recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=128          recall 100%, 1000 absent keys -> -1
+  [ok]   BTree page=256          recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=1000              recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=10000             recall 100%, 1000 absent keys -> -1
+  [ok]   RMI K=100000            recall 100%, 1000 absent keys -> -1
+
+benchmarking (1000000 lookups x 5 reps, median)...
+  BTree page=32    lookup  361.23 ns   traverse  140.51 ns
+  BTree page=64    lookup  349.00 ns   traverse  101.09 ns
+  BTree page=128   lookup  372.63 ns   traverse   81.44 ns
+  BTree page=256   lookup  356.53 ns   traverse   78.42 ns
+  RMI   K=1000    lookup  201.60 ns   model       3.76 ns
+  RMI   K=10000   lookup  152.34 ns   model       4.23 ns
+  RMI   K=100000  lookup  110.86 ns   model       5.50 ns
+
+wrote results_100M.csv (21 rows)

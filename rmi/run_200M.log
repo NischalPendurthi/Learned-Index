@@ -1,0 +1,187 @@
+
+============================================================
+  dense, N = 200000000
+============================================================
+generating dataset...
+
+  Dataset            : dense
+  N keys             : 200000000
+  Key range          : [0, 199999999]
+  Training time      : 3.502 s
+  Stage-2 models (K) : 1000   (empty: 0, single-key: 0)
+  Index size         : 32032 bytes (0.031 MB, 1001 models x 32 B incl. root)
+  Keys per model     : min 200000  max 200000  mean 200000.0  median 200000.0
+  Largest bucket     : 200000 keys (0.10% of N)
+  Model error width  : min 0  max 0  mean 0.00  p50 0.00  p99 0.00
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 0.10%)
+    [PASS] test 5  dense fit is exact (max error width 0)
+
+  Dataset            : dense
+  N keys             : 200000000
+  Key range          : [0, 199999999]
+  Training time      : 3.295 s
+  Stage-2 models (K) : 10000   (empty: 0, single-key: 0)
+  Index size         : 320032 bytes (0.305 MB, 10001 models x 32 B incl. root)
+  Keys per model     : min 20000  max 20000  mean 20000.0  median 20000.0
+  Largest bucket     : 20000 keys (0.01% of N)
+  Model error width  : min 0  max 0  mean 0.00  p50 0.00  p99 0.00
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 0.01%)
+    [PASS] test 5  dense fit is exact (max error width 0)
+
+  Dataset            : dense
+  N keys             : 200000000
+  Key range          : [0, 199999999]
+  Training time      : 3.312 s
+  Stage-2 models (K) : 100000   (empty: 0, single-key: 0)
+  Index size         : 3200032 bytes (3.052 MB, 100001 models x 32 B incl. root)
+  Keys per model     : min 2000  max 2000  mean 2000.0  median 2000.0
+  Largest bucket     : 2000 keys (0.00% of N)
+  Model error width  : min 0  max 0  mean 0.00  p50 0.00  p99 0.00
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 0.00%)
+    [PASS] test 5  dense fit is exact (max error width 0)
+
+  [PASS] test 4  mean error width shrinks with more stage-2 models
+           K=1000: 0.0   K=10000: 0.0   K=100000: 0.0
+
+============================================================
+  lognormal, N = 200000000
+============================================================
+generating dataset...
+
+  Dataset            : lognormal
+  N keys             : 200000000
+  Key range          : [5832, 79637070270]
+  Training time      : 3.302 s
+  Stage-2 models (K) : 1000   (empty: 416, single-key: 0)
+  Index size         : 32032 bytes (0.031 MB, 1001 models x 32 B incl. root)
+  Keys per model     : min 0  max 13568388  mean 200000.0  median 21974.5
+  Largest bucket     : 13568388 keys (6.78% of N)
+  Model error width  : min 94  max 1466145  mean 6167.75  p50 288.50  p99 115959.47
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 6.78%)
+
+  Dataset            : lognormal
+  N keys             : 200000000
+  Key range          : [5832, 79637070270]
+  Training time      : 3.236 s
+  Stage-2 models (K) : 10000   (empty: 4169, single-key: 0)
+  Index size         : 320032 bytes (0.305 MB, 10001 models x 32 B incl. root)
+  Keys per model     : min 0  max 5942472  mean 20000.0  median 2174.0
+  Largest bucket     : 5942472 keys (2.97% of N)
+  Model error width  : min 28  max 1460018  mean 439.23  p50 88.00  p99 1395.00
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 2.97%)
+
+  Dataset            : lognormal
+  N keys             : 200000000
+  Key range          : [5832, 79637070270]
+  Training time      : 3.307 s
+  Stage-2 models (K) : 100000   (empty: 41692, single-key: 0)
+  Index size         : 3200032 bytes (3.052 MB, 100001 models x 32 B incl. root)
+  Keys per model     : min 0  max 5941031  mean 2000.0  median 218.0
+  Largest bucket     : 5941031 keys (2.97% of N)
+  Model error width  : min 5  max 1459433  mean 69.47  p50 27.00  p99 276.00
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 2.97%)
+
+  [PASS] test 4  mean error width shrinks with more stage-2 models
+           K=1000: 6167.7   K=10000: 439.2   K=100000: 69.5
+
+============================================================
+  uniform_sparse, N = 200000000
+============================================================
+generating dataset...
+
+  Dataset            : uniform_sparse
+  N keys             : 200000000
+  Key range          : [12, 999999991]
+  Training time      : 3.391 s
+  Stage-2 models (K) : 1000   (empty: 0, single-key: 0)
+  Index size         : 32032 bytes (0.031 MB, 1001 models x 32 B incl. root)
+  Keys per model     : min 194892  max 204864  mean 200000.0  median 199999.0
+  Largest bucket     : 204864 keys (0.10% of N)
+  Model error width  : min 244  max 1083  mean 470.25  p50 455.00  p99 738.03
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 0.10%)
+
+  Dataset            : uniform_sparse
+  N keys             : 200000000
+  Key range          : [12, 999999991]
+  Training time      : 3.208 s
+  Stage-2 models (K) : 10000   (empty: 0, single-key: 0)
+  Index size         : 320032 bytes (0.305 MB, 10001 models x 32 B incl. root)
+  Keys per model     : min 14142  max 25034  mean 20000.0  median 20000.0
+  Largest bucket     : 25034 keys (0.01% of N)
+  Model error width  : min 71  max 329  mean 149.48  p50 145.00  p99 243.00
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 0.01%)
+
+  Dataset            : uniform_sparse
+  N keys             : 200000000
+  Key range          : [12, 999999991]
+  Training time      : 3.221 s
+  Stage-2 models (K) : 100000   (empty: 2, single-key: 0)
+  Index size         : 3200032 bytes (3.052 MB, 100001 models x 32 B incl. root)
+  Keys per model     : min 0  max 6819  mean 2000.0  median 2000.0
+  Largest bucket     : 6819 keys (0.00% of N)
+  Model error width  : min 19  max 114  mean 46.54  p50 45.00  p99 78.00
+                       (width = max_error - min_error over non-empty models;
+                        0 means the model is exact and search inspects 1 slot)
+
+  correctness:
+    [PASS] test 1  every key found at its position
+    [PASS] test 2  1000 absent keys report not-found
+    [PASS] test 3  no bucket holds >50% of keys (largest 0.00%)
+
+  [PASS] test 4  mean error width shrinks with more stage-2 models
+           K=1000: 470.2   K=10000: 149.5   K=100000: 46.5
+
+wrote rmi_results_200M.csv (9 rows)
+wrote rmi_results_200M.json
+
+============================================================
+  RESULT: correctness passed for all 9 configurations
+============================================================
