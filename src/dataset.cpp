@@ -56,7 +56,7 @@ vu64 generate_dataset(DatasetKind kind, sz n, u64 seed) {
                 double x = dist(rng) * 1e9;
                 if (!(x >= 0.0)) x = 0.0;
                 if (x > 1.8e19) x = 1.8e19;
-                return static_cast<u64>(x);
+                return SC(u64, x);
             });
         }
         case DatasetKind::UniformSparse: {

@@ -17,7 +17,7 @@ inline sz lower_bound_branchless(const u64* arr, sz n, u64 key) {
         base = (base[half] < key) ? base + half : base;  // cmov
         n -= half;
     }
-    return static_cast<sz>(base - arr) + (*base < key);
+    return SC(sz, base - arr) + (*base < key);
 }
 
 // same as above but counts elements <= key (like std::upper_bound)
@@ -28,7 +28,7 @@ inline sz upper_bound_branchless(const u64* arr, sz n, u64 key) {
         base = (base[half] <= key) ? base + half : base;  // cmov
         n -= half;
     }
-    return static_cast<sz>(base - arr) + (*base <= key);
+    return SC(sz, base - arr) + (*base <= key);
 }
 
 // Key array aligned to a 64-byte cache line, used for the B-Tree levels.
@@ -51,7 +51,7 @@ struct AlignedKeys {
         n = count;
         sz bytes = ((count * sizeof(u64) + 63) / 64) * 64;
         if (bytes == 0) bytes = 64;
-        keys = static_cast<u64*>(std::aligned_alloc(64, bytes));
+        keys = SC(u64*, std::aligned_alloc(64, bytes));
     }
 };
 

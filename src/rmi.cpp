@@ -16,40 +16,40 @@ struct Fit {
 template <typename XForm>
 Fit fit_range(const u64* data, sz lo, sz hi, XForm xf) {
     sz cnt = hi - lo;
-    if (cnt == 0) return {0.0, static_cast<double>(lo)};
-    if (cnt == 1) return {0.0, static_cast<double>(lo)};
+    if (cnt == 0) return {0.0, SC(double, lo)};
+    if (cnt == 1) return {0.0, SC(double, lo)};
 
     ld mx = 0.0L, my = 0.0L;
     rep(i, lo, hi) {
         mx += xf(data[i]);
-        my += static_cast<ld>(i);
+        my += SC(ld, i);
     }
     mx /= cnt;
     my /= cnt;
 
     ld sxx = 0.0L, sxy = 0.0L;
     rep(i, lo, hi) {
-        ld dx = static_cast<ld>(xf(data[i])) - mx;
-        ld dy = static_cast<ld>(i) - my;
+        ld dx = SC(ld, xf(data[i])) - mx;
+        ld dy = SC(ld, i) - my;
         sxx += dx * dx;
         sxy += dx * dy;
     }
 
-    if (sxx <= 0.0L) return {0.0, static_cast<double>(lo)};
+    if (sxx <= 0.0L) return {0.0, SC(double, lo)};
     ld slope = sxy / sxx;
     ld intercept = my - slope * mx;
-    double s = static_cast<double>(slope);
-    double b = static_cast<double>(intercept);
-    if (!std::isfinite(s) || !std::isfinite(b) || s <= 0.0) return {0.0, static_cast<double>(lo)};
+    double s = SC(double, slope);
+    double b = SC(double, intercept);
+    if (!std::isfinite(s) || !std::isfinite(b) || s <= 0.0) return {0.0, SC(double, lo)};
     return {s, b};
 }
 
 struct XLinear {
-    ld operator()(u64 k) const { return static_cast<ld>(static_cast<double>(k)); }
+    ld operator()(u64 k) const { return SC(ld, SC(double, k)); }
 };
 struct XLog {
     ld operator()(u64 k) const {
-        return static_cast<ld>(std::log(static_cast<double>(k) + 1.0));
+        return SC(ld, std::log(SC(double, k) + 1.0));
     }
 };
 
@@ -61,7 +61,7 @@ void RMI::build(const u64* sorted_data, sz n, sz num_models) {
     if (num_models < 1) num_models = 1;
     models_.assign(num_models, LinearModel{0.0, 0.0, 0, 0});
 
-    const double scale = static_cast<double>(num_models) / static_cast<double>(n);
+    const double scale = SC(double, num_models) / SC(double, n);
 
     // Stage 1: fit on key and on log(key), scaled from [0, N) down to [0, K).
     struct Cand {
@@ -94,7 +94,7 @@ void RMI::build(const u64* sorted_data, sz n, sz num_models) {
         rep(i, 0, n) counts[model_index(sorted_data[i])]++;
         ld cost = 0.0L;
         rep(m, 0, num_models) {
-            ld c2 = static_cast<ld>(counts[m]);
+            ld c2 = SC(ld, counts[m]);
             cost += c2 * c2;
         }
         cands[c].cost = cost;
@@ -104,10 +104,10 @@ void RMI::build(const u64* sorted_data, sz n, sz num_models) {
     if (best < 0) {
         // both fits failed: just spread min..max key evenly over the models
         s1_kind_ = Stage1Kind::Linear;
-        double k0 = static_cast<double>(sorted_data[0]);
-        double k1 = static_cast<double>(sorted_data[n - 1]);
+        double k0 = SC(double, sorted_data[0]);
+        double k1 = SC(double, sorted_data[n - 1]);
         double span = (k1 > k0) ? (k1 - k0) : 1.0;
-        s1_slope_ = static_cast<double>(num_models) / span;
+        s1_slope_ = SC(double, num_models) / span;
         s1_intercept_ = -s1_slope_ * k0;
     } else {
         s1_kind_ = cands[best].kind;
@@ -148,23 +148,23 @@ void RMI::build(const u64* sorted_data, sz n, sz num_models) {
         i64 mx = std::numeric_limits<i64>::min();
         rep(i, lo, hi) {
             i64 pred = predict_pos(lm, sorted_data[i]);  // same code as lookup()
-            i64 err = static_cast<i64>(i) - pred;
+            i64 err = SC(i64, i) - pred;
             if (err < mn) mn = err;
             if (err > mx) mx = err;
-            total_abs_err += static_cast<ld>(err < 0 ? -err : err);
+            total_abs_err += SC(ld, err < 0 ? -err : err);
         }
-        lm.min_err = static_cast<i32>(mn);
-        lm.max_err = static_cast<i32>(mx);
+        lm.min_err = SC(i32, mn);
+        lm.max_err = SC(i32, mx);
         // errors are stored as int32
-        assert(static_cast<i64>(lm.min_err) == mn && static_cast<i64>(lm.max_err) == mx);
+        assert(SC(i64, lm.min_err) == mn && SC(i64, lm.max_err) == mx);
 
-        sz window = static_cast<sz>(mx - mn + 1);
-        total_window += static_cast<ld>(window) * static_cast<ld>(hi - lo);
+        sz window = SC(sz, mx - mn + 1);
+        total_window += SC(ld, window) * SC(ld, hi - lo);
         if (window > max_window_) max_window_ = window;
     }
 
-    avg_abs_error_ = static_cast<double>(total_abs_err / static_cast<ld>(n));
-    avg_window_ = static_cast<double>(total_window / static_cast<ld>(n));
+    avg_abs_error_ = SC(double, total_abs_err / SC(ld, n));
+    avg_window_ = SC(double, total_window / SC(ld, n));
 }
 
 }  // namespace lidx

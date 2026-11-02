@@ -9,7 +9,7 @@ void BTreeIndex::build(const u64* sorted_data, sz n, int page_size) {
     levels_.clear();
     size_bytes_ = 0;
 
-    const sz P = static_cast<sz>(page_size);
+    const sz P = SC(sz, page_size);
 
     // first key of every leaf page
     sz count = (n + P - 1) / P;

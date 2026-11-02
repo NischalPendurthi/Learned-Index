@@ -28,7 +28,7 @@ public:
     // upper levels only, the data array is not counted
     sz index_size_bytes() const { return size_bytes_; }
 
-    int height() const { return static_cast<int>(levels_.size()) + 1; }
+    int height() const { return SC(int, levels_.size()) + 1; }
     int page_size() const { return page_size_; }
     sz num_leaf_pages() const { return levels_.empty() ? 0 : levels_[0].n; }
 
@@ -42,7 +42,7 @@ private:
 };
 
 inline sz BTreeIndex::traverse_only(u64 key) const {
-    const sz P = static_cast<sz>(page_size_);
+    const sz P = SC(sz, page_size_);
     sz node = 0;  // root is node 0 of the top level
     for (sz l = levels_.size(); l-- > 0;) {
         const AlignedKeys& lv = levels_[l];
@@ -56,12 +56,12 @@ inline sz BTreeIndex::traverse_only(u64 key) const {
 }
 
 inline i64 BTreeIndex::lookup(u64 key) const {
-    const sz P = static_cast<sz>(page_size_);
+    const sz P = SC(sz, page_size_);
     sz page = traverse_only(key);
     sz lo = page * P;
     sz hi = std::min(N_, lo + P);
     sz idx = lo + lower_bound_branchless(data_ + lo, hi - lo, key);
-    if (idx < hi && data_[idx] == key) return static_cast<i64>(idx);
+    if (idx < hi && data_[idx] == key) return SC(i64, idx);
     return -1;
 }
 

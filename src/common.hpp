@@ -21,3 +21,4 @@ inline T clampv(T v, T lo, T hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
 #define rep(i, a, b) for (lidx::sz i = (a); i < (b); ++i)
 #define ALL(v) (v).begin(), (v).end()
+#define SC(T, x) static_cast<T>(x)

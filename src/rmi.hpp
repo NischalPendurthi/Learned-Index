@@ -70,23 +70,23 @@ namespace lidx {
     };
 
     inline sz RMI::model_index(u64 key) const {
-        double x = static_cast<double>(key);
+        double x = SC(double, key);
         if (s1_kind_ == Stage1Kind::LogLinear) x = std::log(x + 1.0);
         double m = s1_slope_ * x + s1_intercept_;
-        double hi = static_cast<double>(models_.size() - 1);
+        double hi = SC(double, models_.size() - 1);
         m = clampv(m, 0.0, hi);
-        return static_cast<sz>(m);
+        return SC(sz, m);
     }
 
     inline i64 RMI::predict_pos(const LinearModel& m, u64 key) const {
-        double p = m.slope * static_cast<double>(key) + m.intercept;
-        double hi = static_cast<double>(N_ - 1);
+        double p = m.slope * SC(double, key) + m.intercept;
+        double hi = SC(double, N_ - 1);
         p = clampv(p, 0.0, hi);
-        return static_cast<i64>(p);
+        return SC(i64, p);
     }
 
     inline sz RMI::predict_only(u64 key) const {
-        return static_cast<sz>(predict_pos(models_[model_index(key)], key));
+        return SC(sz, predict_pos(models_[model_index(key)], key));
     }
 
     inline i64 RMI::lookup(u64 key) const {
@@ -96,11 +96,11 @@ namespace lidx {
         i64 lo = pred + m.min_err;
         i64 hi = pred + m.max_err;
         if (lo < 0) lo = 0;
-        if (hi > static_cast<i64>(N_) - 1) hi = static_cast<i64>(N_) - 1;
+        if (hi > SC(i64, N_) - 1) hi = SC(i64, N_) - 1;
         if (lo > hi) return -1;
 
-        sz off = lower_bound_branchless(data_ + lo, static_cast<sz>(hi - lo + 1), key);
-        i64 idx = lo + static_cast<i64>(off);
+        sz off = lower_bound_branchless(data_ + lo, SC(sz, hi - lo + 1), key);
+        i64 idx = lo + SC(i64, off);
         if (idx <= hi && data_[idx] == key) return idx;
         return -1;
     }
