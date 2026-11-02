@@ -1,0 +1,46 @@
+Commands to build and run the project
+Run everything from the project folder: cd ~/Desktop/cs631/project
+
+NOTE: by default the programs overwrite the saved results
+(benchmark_results.csv, rmi/rmi_results.csv). For demos always pass
+--out / --csv / --json with a new file name, as below.
+
+
+1. Main result: RMI vs B-Tree
+-----------------------------
+g++ -std=c++17 -O3 -march=native -o benchmark src/*.cpp bench/benchmark.cpp
+
+# quick demo, ~10 s (1M keys fit in cache, so speedups are smaller: ~2-6x)
+./benchmark --sizes 1000000 --lookups 200000 --reps 3 --out demo.csv
+
+# numbers from the report
+./benchmark --sizes 10000000 --out demo_10M.csv      # ~1 minute
+./benchmark --sizes 100000000 --out demo_100M.csv    # several minutes, ~2 GB RAM
+
+Flags: --sizes A,B   --lookups N   --reps R   --out FILE   --verify-sample K
+
+
+2. Standalone RMI: error stats and tests 1-5
+--------------------------------------------
+cd rmi
+make
+./rmi_main --dataset all --n 1000000 --k 10000 --csv /tmp/a.csv --json /tmp/a.json
+
+# lookup timing, binary vs exponential search
+./rmi_bench --dataset all --n 1000000 --k 1000,10000
+cd ..
+
+Flags: --dataset dense|lognormal|uniform_sparse|all   --n LIST   --k LIST
+       --seed S   --search binary|exponential   --verify-limit M   --csv PATH   --json PATH
+
+
+3. Charts
+---------
+python3 plots/make_plots.py        # redraws plots/*.png from the saved CSVs
+
+
+Live demo for the professor (under 20 s)
+----------------------------------------
+./benchmark --sizes 1000000 --lookups 200000 --reps 3 --out demo.csv
+cd rmi && ./rmi_main --dataset lognormal --n 1000000 --k 1000,10000,100000 --csv /tmp/a.csv --json /tmp/a.json
+# then open plots/1_lookup_time_100M.png for the full 100M result
