@@ -1,46 +1,40 @@
-// Branch-free search primitives shared by the RMI and the B-Tree baseline.
-//
-// Both indexes use the *same* primitives so that any measured difference comes
-// from the index structure, not from the search implementation.
+// Binary search used by both the RMI and the B-Tree, so the comparison
+// between them isn't affected by the search code.
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
+#include "common.hpp"
 #include <cstdlib>
 
 namespace lidx {
 
-// Number of elements in arr[0, n) that are < key.  Equivalent to
-// std::lower_bound(arr, arr + n, key) - arr, but the branch is compiled to a
-// cmov so it does not depend on the (unpredictable) comparison outcome.
-// Requires n >= 1.
-inline size_t lower_bound_branchless(const uint64_t* arr, size_t n, uint64_t key) {
-    const uint64_t* base = arr;
+// Same result as std::lower_bound, but the comparison compiles to a cmov
+// instead of a branch, so there are no mispredictions. n must be >= 1.
+inline sz lower_bound_branchless(const u64* arr, sz n, u64 key) {
+    const u64* base = arr;
     while (n > 1) {
-        size_t half = n >> 1;
+        sz half = n >> 1;
         base = (base[half] < key) ? base + half : base;  // cmov
         n -= half;
     }
-    return static_cast<size_t>(base - arr) + (*base < key);
+    return static_cast<sz>(base - arr) + (*base < key);
 }
 
-// Number of elements in arr[0, n) that are <= key (an upper bound).
-// Requires n >= 1.
-inline size_t upper_bound_branchless(const uint64_t* arr, size_t n, uint64_t key) {
-    const uint64_t* base = arr;
+// same as above but counts elements <= key (like std::upper_bound)
+inline sz upper_bound_branchless(const u64* arr, sz n, u64 key) {
+    const u64* base = arr;
     while (n > 1) {
-        size_t half = n >> 1;
+        sz half = n >> 1;
         base = (base[half] <= key) ? base + half : base;  // cmov
         n -= half;
     }
-    return static_cast<size_t>(base - arr) + (*base <= key);
+    return static_cast<sz>(base - arr) + (*base <= key);
 }
 
-// 64-byte (cache-line) aligned array of keys.  Used for B-Tree internal levels
-// so that a node's keys are packed contiguously and start on a line boundary.
+// Key array aligned to a 64-byte cache line, used for the B-Tree levels.
 struct AlignedKeys {
-    uint64_t* keys = nullptr;
-    size_t n = 0;
+    u64* keys = nullptr;
+    sz n = 0;
 
     AlignedKeys() = default;
     AlignedKeys(const AlignedKeys&) = delete;
@@ -52,12 +46,12 @@ struct AlignedKeys {
     }
     ~AlignedKeys() { std::free(keys); }
 
-    void alloc(size_t count) {
+    void alloc(sz count) {
         std::free(keys);
         n = count;
-        size_t bytes = ((count * sizeof(uint64_t) + 63) / 64) * 64;
+        sz bytes = ((count * sizeof(u64) + 63) / 64) * 64;
         if (bytes == 0) bytes = 64;
-        keys = static_cast<uint64_t*>(std::aligned_alloc(64, bytes));
+        keys = static_cast<u64*>(std::aligned_alloc(64, bytes));
     }
 };
 

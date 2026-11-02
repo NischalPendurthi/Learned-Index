@@ -17,77 +17,73 @@ const char* dataset_name(DatasetKind kind) {
 
 namespace {
 
-// Draws until exactly n unique sorted keys are collected.  Collisions are rare
-// for both random generators used here, so this normally converges in one pass.
+// Draw a few extra keys, sort, remove duplicates, and repeat until we have n.
+// Duplicates are rare, so one round is usually enough.
 template <typename Draw>
-std::vector<uint64_t> unique_sorted(size_t n, Draw draw) {
-    std::vector<uint64_t> v;
+vu64 unique_sorted(sz n, Draw draw) {
+    vu64 v;
     v.reserve(n + n / 50 + 16);
-    size_t target = n + n / 50 + 16;
-    for (size_t i = 0; i < target; ++i) v.push_back(draw());
-    std::sort(v.begin(), v.end());
-    v.erase(std::unique(v.begin(), v.end()), v.end());
+    sz target = n + n / 50 + 16;
+    rep(i, 0, target) v.push_back(draw());
+    std::sort(ALL(v));
+    v.erase(std::unique(ALL(v)), v.end());
 
     while (v.size() < n) {
-        size_t need = (n - v.size()) * 2 + 16;
-        for (size_t i = 0; i < need; ++i) v.push_back(draw());
-        std::sort(v.begin(), v.end());
-        v.erase(std::unique(v.begin(), v.end()), v.end());
+        sz need = (n - v.size()) * 2 + 16;
+        rep(i, 0, need) v.push_back(draw());
+        std::sort(ALL(v));
+        v.erase(std::unique(ALL(v)), v.end());
     }
-    v.resize(n);  // still sorted and unique; no shrink, to avoid a 2x peak
+    v.resize(n);  // no shrink_to_fit, it would briefly need 2x memory
     return v;
 }
 
 }  // namespace
 
-std::vector<uint64_t> generate_dataset(DatasetKind kind, size_t n, uint64_t seed) {
+vu64 generate_dataset(DatasetKind kind, sz n, u64 seed) {
     std::mt19937_64 rng(seed);
 
     switch (kind) {
         case DatasetKind::Dense: {
-            std::vector<uint64_t> v(n);
-            for (size_t i = 0; i < n; ++i) v[i] = i;
+            vu64 v(n);
+            rep(i, 0, n) v[i] = i;
             return v;
         }
         case DatasetKind::Lognormal: {
-            // lognormal(mu=0, sigma=2), scaled so the median key is 1e9.  The
-            // scale keeps the heavy tail intact while making exact collisions
-            // rare enough to dedupe cheaply.
+            // scaled by 1e9 so the median key is 1e9 and duplicates are rare
             std::lognormal_distribution<double> dist(0.0, 2.0);
-            return unique_sorted(n, [&]() -> uint64_t {
+            return unique_sorted(n, [&]() -> u64 {
                 double x = dist(rng) * 1e9;
                 if (!(x >= 0.0)) x = 0.0;
                 if (x > 1.8e19) x = 1.8e19;
-                return static_cast<uint64_t>(x);
+                return static_cast<u64>(x);
             });
         }
         case DatasetKind::UniformSparse: {
-            std::uniform_int_distribution<uint64_t> dist(0, (1ULL << 63) - 1);
-            return unique_sorted(n, [&]() -> uint64_t { return dist(rng); });
+            std::uniform_int_distribution<u64> dist(0, (1ULL << 63) - 1);
+            return unique_sorted(n, [&]() -> u64 { return dist(rng); });
         }
     }
     return {};
 }
 
-std::vector<uint64_t> sample_existing_keys(const std::vector<uint64_t>& data, size_t count,
-                                           uint64_t seed) {
+vu64 sample_existing_keys(const vu64& data, sz count, u64 seed) {
     std::mt19937_64 rng(seed);
-    std::uniform_int_distribution<size_t> pick(0, data.size() - 1);
-    std::vector<uint64_t> out(count);
-    for (size_t i = 0; i < count; ++i) out[i] = data[pick(rng)];
-    std::shuffle(out.begin(), out.end(), rng);  // no sequential access pattern
+    std::uniform_int_distribution<sz> pick(0, data.size() - 1);
+    vu64 out(count);
+    rep(i, 0, count) out[i] = data[pick(rng)];
+    std::shuffle(ALL(out), rng);
     return out;
 }
 
-std::vector<uint64_t> sample_absent_keys(const std::vector<uint64_t>& data, size_t count,
-                                         uint64_t seed) {
+vu64 sample_absent_keys(const vu64& data, sz count, u64 seed) {
     std::mt19937_64 rng(seed);
-    std::uniform_int_distribution<uint64_t> dist(0, ~0ULL);
-    std::vector<uint64_t> out;
+    std::uniform_int_distribution<u64> dist(0, ~0ULL);
+    vu64 out;
     out.reserve(count);
     while (out.size() < count) {
-        uint64_t k = dist(rng);
-        if (!std::binary_search(data.begin(), data.end(), k)) out.push_back(k);
+        u64 k = dist(rng);
+        if (!std::binary_search(ALL(data), k)) out.push_back(k);
     }
     return out;
 }

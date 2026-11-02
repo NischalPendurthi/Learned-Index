@@ -8,14 +8,9 @@
 namespace rmi {
 namespace {
 
-// Closed-form least squares over data[lo..hi), with position as the label:
-//
-//   slope     = cov(x, y) / var(x)
-//   intercept = mean_y - slope * mean_x
-//
-// Accumulated in long double.  Keys reach 2^63 and n reaches 2e8, so the
-// uncentred normal equations lose far too much precision; the centred form
-// plus a wider accumulator keeps the fit stable.
+// Least squares fit of position on key over keys[lo..hi).
+// Uses centred sums in long double: keys go up to 2^63 and n up to 2e8, so the
+// uncentred form loses too much precision.
 LinearModel fit_segment(const Key* keys, size_t lo, size_t hi) {
     LinearModel m;
     size_t count = hi - lo;
@@ -25,8 +20,6 @@ LinearModel fit_segment(const Key* keys, size_t lo, size_t hi) {
         return m;
     }
     if (count == 1) {
-        // var_x == 0: the model degenerates to "always this position", which
-        // is exact for the single key it owns.
         m.slope = 0.0;
         m.intercept = static_cast<double>(lo);
         return m;
@@ -48,7 +41,7 @@ LinearModel fit_segment(const Key* keys, size_t lo, size_t hi) {
         var_x += dx * dx;
     }
 
-    if (var_x <= 0.0L) {  // all keys in the bucket are identical
+    if (var_x <= 0.0L) {  // all keys identical
         m.slope = 0.0;
         m.intercept = static_cast<double>(mean_y);
         return m;
@@ -59,8 +52,7 @@ LinearModel fit_segment(const Key* keys, size_t lo, size_t hi) {
     double s = static_cast<double>(slope);
     double b = static_cast<double>(intercept);
     if (!std::isfinite(s) || !std::isfinite(b) || s < 0.0) {
-        // A negative slope would break the monotone routing that the
-        // contiguous-bucket assignment depends on.  Fall back to a flat model.
+        // negative slope would break monotone routing, so use a flat model
         m.slope = 0.0;
         m.intercept = static_cast<double>(mean_y);
         return m;
@@ -90,16 +82,11 @@ void RMI::train(const Key* keys, size_t n, size_t num_stage2) {
     n_ = n;
     k_ = (num_stage2 < 1) ? 1 : num_stage2;
 
-    // --- Step 2: root model over every (key, position) pair ------------------
     root_ = fit_segment(keys, 0, n);
 
-    // --- Step 3: route keys to buckets ---------------------------------------
-    // bucket_for() is monotone non-decreasing in the key (slope >= 0, and both
-    // truncation and floor preserve order), and the input array is sorted, so
-    // each bucket owns a *contiguous* run of positions.  Storing the run
-    // boundaries is exactly equivalent to materializing a key vector per
-    // bucket, and avoids a second copy of the whole dataset -- which is what
-    // makes N = 100M+ fit in memory at all.
+    // bucket_for() never decreases as the key grows and the array is sorted, so
+    // each bucket is a contiguous run. Storing just the run starts avoids
+    // copying the dataset per bucket, which matters at N = 100M+.
     stage2_.assign(k_, LinearModel{});
     std::vector<size_t> start(k_ + 1, n);
     {
@@ -113,7 +100,6 @@ void RMI::train(const Key* keys, size_t n, size_t num_stage2) {
         while (prev < k_) start[++prev] = n;
     }
 
-    // --- Step 4/5: fit each bucket and measure its error bounds --------------
     std::vector<size_t> bucket_counts(k_);
     std::vector<int64_t> err_widths;
     err_widths.reserve(k_);
@@ -128,12 +114,8 @@ void RMI::train(const Key* keys, size_t n, size_t num_stage2) {
         LinearModel m = fit_segment(keys, lo, hi);
 
         if (hi == lo) {
-            // Empty bucket.  Only keys absent from the dataset can route here:
-            // every key present at training time routes to the bucket that
-            // owns it, and that bucket is non-empty by construction.  We still
-            // point the dummy model at the boundary and widen it by one slot on
-            // each side, so a lookup inspects the neighbouring keys rather than
-            // trusting the routing blindly.
+            // empty bucket: only absent keys land here. Point at the boundary
+            // and widen by one slot each side so neighbours get checked.
             m.slope = 0.0;
             m.intercept = static_cast<double>(lo);
             m.min_error = -1;
@@ -147,10 +129,9 @@ void RMI::train(const Key* keys, size_t n, size_t num_stage2) {
         int64_t min_err = std::numeric_limits<int64_t>::max();
         int64_t max_err = std::numeric_limits<int64_t>::min();
         for (size_t i = lo; i < hi; ++i) {
-            // Identical arithmetic to the lookup path -- this is what makes the
-            // stored bounds valid at query time.
+            // same arithmetic as lookup, otherwise the bounds would not hold
             int64_t pred = m.predict(keys[i]);
-            int64_t err = pred - static_cast<int64_t>(i);  // see LinearModel
+            int64_t err = pred - static_cast<int64_t>(i);  // sign convention in linear_model.h
             if (err < min_err) min_err = err;
             if (err > max_err) max_err = err;
         }
@@ -163,7 +144,6 @@ void RMI::train(const Key* keys, size_t n, size_t num_stage2) {
         width_sum += static_cast<long double>(width);
     }
 
-    // --- statistics -----------------------------------------------------------
     TrainStats s;
     s.n = n;
     s.num_models = k_;

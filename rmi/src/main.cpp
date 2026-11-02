@@ -1,7 +1,4 @@
-// Entry point: build a 2-stage RMI over each requested dataset, print the
-// training report, run the correctness tests, and save results for the
-// benchmark harness to consume.
-//
+// Trains a 2-stage RMI on each dataset, prints stats and runs the correctness tests.
 //   ./rmi_main --dataset all --n 1000000 --k 10000
 
 #include <algorithm>
@@ -33,8 +30,7 @@ struct Result {
     bool routing_balanced = false;
 };
 
-// ---- test 1 & 2 ---------------------------------------------------------
-// Every key must be found at its exact position; no absent key may be found.
+// tests 1 and 2: every key found at its position, no absent key found
 void run_correctness(const RMI& index, const std::vector<Key>& data,
                      const std::vector<Key>& absent, size_t verify_limit, Result* out) {
     size_t n = data.size();
@@ -57,7 +53,7 @@ void run_correctness(const RMI& index, const std::vector<Key>& data,
             if (!have_bad) { first_bad = data[i]; first_bad_i = i; have_bad = true; }
         }
     }
-    // Always probe both endpoints, whatever the stride.
+    // always check both ends
     if (!index.lookup(data[0]).found) ++missing;
     if (!index.lookup(data[n - 1]).found) ++missing;
 
@@ -256,7 +252,7 @@ int main(int argc, char** argv) {
             }
             std::vector<Key> absent = sample_absent(data, ABSENT_PROBES, seed ^ 0x9E3779B9ULL);
 
-            std::vector<double> mean_widths;  // for test 4, across the K values
+            std::vector<double> mean_widths;  // for test 4
 
             for (size_t k : ks) {
                 RMI index;
@@ -306,7 +302,7 @@ int main(int argc, char** argv) {
                 results.push_back(std::move(r));
             }
 
-            // ---- test 4: error width should shrink as K grows -----------------
+            // test 4: error width should shrink as K grows
             if (ks.size() >= 2) {
                 bool shrinks = true;
                 for (size_t i = 1; i < mean_widths.size(); ++i) {

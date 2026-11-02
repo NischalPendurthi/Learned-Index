@@ -1,14 +1,8 @@
-// Benchmark harness: Recursive Model Index vs. a cache-optimized read-only
-// B-Tree, over the same sorted array and the same lookup workload.
-//
+// Benchmark: RMI vs a read-only B-Tree on the same sorted array and lookups.
 //   g++ -std=c++17 -O3 -march=native -o benchmark src/*.cpp bench/benchmark.cpp
-//
-// Usage:
 //   ./benchmark [--sizes 10000000,100000000] [--lookups 1000000] [--reps 5]
 //               [--out benchmark_results.csv] [--verify-sample 0]
-//
-// --verify-sample K checks K sampled keys instead of all N during the
-// correctness phase (0 = check every key, the default).
+// --verify-sample K checks K keys instead of all N (0 = all).
 
 #include <algorithm>
 #include <chrono>
@@ -33,9 +27,9 @@ constexpr uint64_t kSampleSeed = 0xA11CE99ULL;
 constexpr uint64_t kAbsentSeed = 0xBEEF4242ULL;
 constexpr size_t kWarmup = 1000;
 constexpr size_t kAbsentChecks = 1000;
-constexpr int kReferencePage = 128;  // BTree-128 is the reference, per the paper
+constexpr int kReferencePage = 128;  // paper uses BTree-128 as baseline
 
-// Written on every timed iteration so the lookup cannot be optimized away.
+// written every iteration so the compiler keeps the lookups
 volatile int64_t g_sink = 0;
 
 struct Row {
@@ -46,7 +40,7 @@ struct Row {
     size_t index_size_bytes = 0;
     double lookup_ns = 0;
     double model_ns = 0;
-    // Filled in once the BTree-128 reference for this (dataset, N) is known.
+    // set after the BTree-128 reference is known
     double speedup = 0;
     double size_ratio = 0;
     size_t group = 0;  // (dataset, N) group id
@@ -60,8 +54,7 @@ double median(std::vector<double> v) {
     return 0.5 * (v[m - 1] + v[m]);
 }
 
-// Times fn over the sample, reps times, and returns the median ns per call.
-// Build/training time is never inside this loop.
+// median ns per call over reps runs; build time is not included
 template <typename Fn>
 double measure_ns_per_op(Fn&& fn, const std::vector<uint64_t>& sample, size_t num_lookups,
                          int reps) {
@@ -82,7 +75,6 @@ double measure_ns_per_op(Fn&& fn, const std::vector<uint64_t>& sample, size_t nu
     return median(std::move(per_rep));
 }
 
-// 100% recall over the dataset, and -1 for keys that are absent.
 template <typename Index>
 bool verify(const Index& index, const std::vector<uint64_t>& data,
             const std::vector<uint64_t>& absent, const char* label, size_t verify_sample) {
@@ -101,7 +93,7 @@ bool verify(const Index& index, const std::vector<uint64_t>& data,
             }
         }
     } else {
-        // Deterministic stride sample, plus both endpoints.
+        // fixed stride, plus the last key
         size_t stride = n / verify_sample;
         if (stride == 0) stride = 1;
         for (size_t i = 0; i < n; i += stride) {
@@ -135,7 +127,6 @@ bool verify(const Index& index, const std::vector<uint64_t>& data,
     return true;
 }
 
-// 200000 -> "200K", 10000000 -> "10M"
 std::string format_count(size_t n) {
     char buf[32];
     if (n >= 1'000'000 && n % 1'000'000 == 0) std::snprintf(buf, sizeof(buf), "%zuM", n / 1'000'000);
@@ -206,7 +197,6 @@ int main(int argc, char** argv) {
                          data.size(), std::chrono::duration<double>(t1 - t0).count(), data.front(),
                          data.back());
 
-            // ---- build (never timed as part of a lookup measurement) --------
             std::vector<BTreeIndex> btrees(pages.size());
             for (size_t p = 0; p < pages.size(); ++p) {
                 btrees[p].build(data.data(), data.size(), pages[p]);
@@ -217,7 +207,6 @@ int main(int argc, char** argv) {
                 rmis[k].build(data.data(), data.size(), rmi_ks[k]);
             }
 
-            // ---- structure report -------------------------------------------
             std::fprintf(stderr, "\nstructure:\n");
             for (size_t p = 0; p < pages.size(); ++p) {
                 std::fprintf(stderr,
@@ -234,7 +223,7 @@ int main(int argc, char** argv) {
                              rmis[k].avg_search_window(), rmis[k].max_search_window());
             }
 
-            // ---- correctness, before any timing ------------------------------
+            // check correctness before timing anything
             std::fprintf(stderr, "\ncorrectness checks:\n");
             std::vector<uint64_t> absent = sample_absent_keys(data, kAbsentChecks, kAbsentSeed);
             bool ok = true;
@@ -255,8 +244,7 @@ int main(int argc, char** argv) {
                 return 1;
             }
 
-            // ---- workload ----------------------------------------------------
-            // One sample, shared by every index in this group.
+            // same sample for every index in this group
             std::vector<uint64_t> sample = sample_existing_keys(data, num_lookups, kSampleSeed);
 
             std::fprintf(stderr, "\nbenchmarking (%zu lookups x %d reps, median)...\n", num_lookups,
@@ -309,7 +297,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    // ---- normalize against BTree-128 within each (dataset, N) group ---------
+    // speedup and size ratio vs BTree-128 within each (dataset, N) group
     for (size_t g = 0; g < group_id; ++g) {
         double ref_lookup = 0, ref_size = 0;
         for (const Row& r : rows) {
@@ -325,7 +313,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    // ---- table --------------------------------------------------------------
     const int widths[] = {20, 5, 10, 11, 10, 10, 10, 7, 8, 10};
     std::string sep = "|";
     for (int w : widths) sep += std::string(w + 2, '-') + "|";
@@ -353,7 +340,6 @@ int main(int argc, char** argv) {
         "Model(ns) is the RMI's two-stage prediction, or the B-Tree's root-to-leaf descent.\n"
         "Index size excludes the sorted data array, which both structures share.\n");
 
-    // ---- CSV ----------------------------------------------------------------
     FILE* f = std::fopen(out_csv.c_str(), "w");
     if (!f) {
         std::fprintf(stderr, "could not open %s for writing\n", out_csv.c_str());

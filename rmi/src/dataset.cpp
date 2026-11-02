@@ -25,8 +25,7 @@ bool parse_dataset(const std::string& name, DatasetKind* out) {
 
 namespace {
 
-// Draw-sort-dedupe until n unique keys are collected.  Fine when the value
-// space is far larger than n (lognormal), where collisions are rare.
+// draw, sort, dedupe until we have n keys; ok when collisions are rare (lognormal)
 template <typename Draw>
 std::vector<Key> unique_sorted_by_rejection(size_t n, Draw draw) {
     std::vector<Key> v;
@@ -46,10 +45,8 @@ std::vector<Key> unique_sorted_by_rejection(size_t n, Draw draw) {
     return v;
 }
 
-// Unique uniform draws from a *bounded* range.  Sort-and-dedupe is the wrong
-// tool here: drawing 200M unique values from [0, 1e9) needs ~223M draws and a
-// 1.8 GB sort.  A presence bitset over the range costs 125 MB flat and emits
-// the keys already sorted.
+// Sorting 200M draws from [0, 1e9) would need a ~1.8 GB sort, so use a bitset
+// over the range instead (125 MB), which also gives sorted output.
 std::vector<Key> unique_uniform_bounded(size_t n, uint64_t range, uint64_t seed) {
     if (n > range) return {};
 
@@ -57,8 +54,7 @@ std::vector<Key> unique_uniform_bounded(size_t n, uint64_t range, uint64_t seed)
     std::uniform_int_distribution<uint64_t> dist(0, range - 1);
     std::vector<bool> chosen(range, false);
 
-    // Rejection sampling. Expected draws = range * ln(range / (range - n)),
-    // which is only ~1.12n at the densest configuration used here (n/range=0.2).
+    // expected draws are only ~1.12n at n/range = 0.2
     size_t placed = 0;
     while (placed < n) {
         uint64_t v = dist(rng);

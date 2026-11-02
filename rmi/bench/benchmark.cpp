@@ -1,10 +1,5 @@
-// Lookup-timing harness for the RMI on its own.
-//
-// The full RMI-vs-B-Tree comparison lives in the parent project
-// (../../bench/benchmark.cpp).  This one answers a narrower question: how long
-// does an RMI lookup take, and how much of that is the two-stage model versus
-// the search inside the predicted bounds?
-//
+// Times RMI lookups alone and splits model time from search time.
+// The RMI vs B-Tree comparison is in ../../bench/benchmark.cpp.
 //   ./rmi_bench --dataset all --n 10000000 --k 1000,10000,100000
 
 #include <algorithm>
@@ -27,7 +22,7 @@ namespace {
 
 constexpr size_t kWarmup = 1000;
 
-// Written every iteration so the lookup cannot be optimized away.
+// written every iteration so the compiler keeps the lookups
 volatile int64_t g_sink = 0;
 
 double median(std::vector<double> v) {
@@ -123,7 +118,7 @@ int main(int argc, char** argv) {
                     index.set_search_mode(mode);
                     index.train(data.data(), data.size(), k);
 
-                    // Sanity check before timing: no point measuring a broken index.
+                    // spot check before timing
                     bool ok = true;
                     for (size_t i = 0; i < data.size() && ok; i += (data.size() / 10000) + 1) {
                         LookupResult r = index.lookup(data[i]);
