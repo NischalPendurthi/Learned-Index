@@ -1,0 +1,4 @@
+comment = 'learned index (recursive model index) access method for bigint columns'
+default_version = '1.0'
+module_pathname = 'rmi'
+relocatable = true

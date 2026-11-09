@@ -1,3 +1,23 @@
+# Learned index: RMI benchmark and PostgreSQL index
+
+The final write-up is [final_report.pdf](final_report.pdf). The project now has
+two parts:
+
+* **[pg_rmi/](pg_rmi/)**: the learned index as a PostgreSQL 18 index type
+  (`CREATE INDEX ... USING rmi (k)`), with inserts, VACUUM, `REINDEX` retraining
+  and crash recovery. Commands are in [cmds.txt](cmds.txt), results in
+  [pg_rmi/eval/results/](pg_rmi/eval/results/).
+* **The in-memory benchmark** described below. Since the checkpoint it also has a
+  piecewise-linear stage 1 (`Stage1Kind::Piecewise`), a hybrid index
+  ([src/hybrid.hpp](src/hybrid.hpp), paper Algorithm 1), and a loader for real
+  SOSD datasets (`load_sosd`).
+
+Timings from different days are not comparable on this machine: the B-Tree
+baseline alone moved by 35-40% between the checkpoint and the final runs. Trust
+comparisons made within one run. The Results section below is from the checkpoint;
+`results_final_100M.csv`, `results_stage1_100M.csv`, `results_hybrid_100M.csv` and
+`results_real_fb_100M.csv` are the final runs.
+
 # RMI vs. cache-optimized B-Tree — benchmark harness
 
 Reproduces the core read-path comparison from Kraska et al., *The Case for

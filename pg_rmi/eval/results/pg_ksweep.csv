@@ -1,0 +1,6 @@
+models,build_s,model_kb,stage1,avg_window,max_window,index_buffers_hit,index_buffers_absent,warm_latency_us
+100,6.2,2.3,piecewise,1478.5,17056,1.593,1.593,15.0
+1000,3.26,23.4,piecewise,120.6,555,1.042,1.042,15.0
+10000,3.17,234.4,piecewise,37.3,80,1.012,1.012,14.0
+100000,3.17,2343.8,piecewise,11.6,35,1.004,1.004,15.0
+500000,3.22,11718.8,piecewise,5.0,16,1.004,1.004,15.0

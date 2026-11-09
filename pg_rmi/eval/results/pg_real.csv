@@ -1,0 +1,3 @@
+dataset,index,rows,build_s,index_mb,table_mb,index_buffers_hit,index_buffers_absent,server_lookup_us,stats
+fb,btree,10000000,4.77,214.23,422.75,3.0,3.0,3.222,height 3
+fb,rmi,10000000,3.44,149.92,422.75,1.064,1.064,2.433,"10000 models, piecewise, avg window 180.0, max window 1296"

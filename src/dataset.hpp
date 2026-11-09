@@ -16,6 +16,11 @@ const char* dataset_name(DatasetKind kind);
 //   UniformSparse: uniform in [0, 2^63)
 vu64 generate_dataset(DatasetKind kind, sz n, u64 seed);
 
+// Reads a SOSD binary file (a u64 count, then that many u64 keys), and returns
+// its unique keys sorted. If n > 0 and the file has more, every stride-th key
+// is kept so the sample still has the file's distribution.
+vu64 load_sosd(const char* path, sz n);
+
 // random keys from data (with repeats), shuffled so lookups aren't sequential
 vu64 sample_existing_keys(const vu64& data, sz count, u64 seed);
 

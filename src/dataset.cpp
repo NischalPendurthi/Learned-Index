@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <random>
+#include <stdexcept>
+#include <string>
 
 namespace lidx {
 
@@ -65,6 +68,38 @@ vu64 generate_dataset(DatasetKind kind, sz n, u64 seed) {
         }
     }
     return {};
+}
+
+vu64 load_sosd(const char* path, sz n) {
+    FILE* f = std::fopen(path, "rb");
+    if (!f) throw std::runtime_error(std::string("cannot open ") + path);
+    u64 count = 0;
+    if (std::fread(&count, sizeof(u64), 1, f) != 1) {
+        std::fclose(f);
+        throw std::runtime_error("cannot read SOSD header");
+    }
+    std::fseek(f, 0, SEEK_END);
+    long bytes = std::ftell(f);
+    std::fseek(f, sizeof(u64), SEEK_SET);
+    // the header is untrusted: it has to agree with the file's actual size
+    if (bytes < 0 || SC(u64, bytes) != sizeof(u64) + count * sizeof(u64)) {
+        std::fclose(f);
+        throw std::runtime_error("SOSD header does not match file size");
+    }
+    vu64 all(count);
+    sz got = std::fread(all.data(), sizeof(u64), count, f);
+    std::fclose(f);
+    if (got != count) throw std::runtime_error("short read on SOSD file");
+
+    std::sort(ALL(all));
+    all.erase(std::unique(ALL(all)), all.end());
+    if (n == 0 || all.size() <= n) return all;
+
+    vu64 out;
+    out.reserve(n);
+    long double stride = SC(ld, all.size()) / n;
+    rep(i, 0, n) out.push_back(all[SC(sz, i * stride)]);
+    return out;
 }
 
 vu64 sample_existing_keys(const vu64& data, sz count, u64 seed) {

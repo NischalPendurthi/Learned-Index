@@ -1,0 +1,7 @@
+dataset,index,rows,build_s,index_mb,table_mb,index_buffers_hit,index_buffers_absent,warm_latency_us,warm_tps_8c,stats,server_lookup_us
+dense,btree,10000000,4.7,214.23,422.75,3.0,3.0,16.0,108724.0,height 3,3.399
+dense,rmi,10000000,3.41,149.91,422.75,1.0,1.0,14.0,109432.5,"10000 models, linear, avg window 1.0, max window 1",2.492
+uniform_sparse,btree,10000000,4.81,214.23,422.75,3.0,3.0,16.0,104859.5,height 3,3.44
+uniform_sparse,rmi,10000000,3.42,149.91,422.75,1.008,1.008,14.0,110111.7,"10000 models, linear, avg window 37.2, max window 88",2.508
+lognormal,btree,10000000,4.8,214.23,422.75,3.0,3.0,14.0,108510.5,height 3,3.438
+lognormal,rmi,10000000,3.49,149.92,422.75,1.012,1.012,13.0,113243.5,"10000 models, piecewise, avg window 37.3, max window 80",2.516

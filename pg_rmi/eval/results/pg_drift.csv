@@ -1,0 +1,13 @@
+step,new_key_pct,index,index_mb,index_buffers_hit,warm_latency_us,overflow_pages,overflow_entries,reindex_s
+baseline,0.0,btree,214.23,3.0,15.0,0,0,4.24
+baseline,0.0,rmi,149.92,1.012,15.0,0,0,4.24
+after 1% inserts,1.0,btree,214.23,3.0,17.0,0,0,4.24
+after 1% inserts,1.0,rmi,149.92,1.008,12.0,0,0,4.24
+after 5% inserts,5.0,btree,214.23,3.0,13.0,0,0,4.24
+after 5% inserts,5.0,rmi,149.92,1.01,12.0,0,0,4.24
+after 10% inserts,10.0,btree,270.37,3.0,14.0,0,0,4.24
+after 10% inserts,10.0,rmi,175.14,1.173,13.0,3228,15552,4.24
+after 25% inserts,25.0,btree,428.14,3.0,14.0,0,0,4.24
+after 25% inserts,25.0,rmi,299.38,2.012,13.0,19130,1371272,4.24
+after REINDEX,25.0,btree,428.14,3.0,13.0,0,0,4.24
+after REINDEX,25.0,rmi,187.39,1.014,13.0,0,0,4.24

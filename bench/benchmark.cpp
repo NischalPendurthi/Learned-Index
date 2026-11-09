@@ -1,6 +1,6 @@
 // Benchmark: RMI vs a read-only B-Tree on the same sorted array and lookups.
 //   g++ -std=c++17 -O3 -march=native -o benchmark src/*.cpp bench/benchmark.cpp
-//   ./benchmark [--sizes 10000000,100000000] [--lookups 1000000] [--reps 5]
+//   ./benchmark [--sizes 10000000,100000000] [--ks 1000,10000,100000] [--lookups 1000000] [--reps 5]
 //               [--out benchmark_results.csv] [--verify-sample 0]
 // --verify-sample K checks K keys instead of all N (0 = all).
 
@@ -159,9 +159,12 @@ int main(int argc, char** argv) {
     int reps = 5;
     size_t verify_sample = 0;
     std::string out_csv = "benchmark_results.csv";
+    std::string dataset_filter;  // empty = all
 
     for (int i = 1; i < argc; ++i) {
+        if (!std::strcmp(argv[i], "--dataset") && i + 1 < argc) { dataset_filter = argv[++i]; continue; }
         if (!std::strcmp(argv[i], "--sizes") && i + 1 < argc) sizes = parse_sizes(argv[++i]);
+        else if (!std::strcmp(argv[i], "--ks") && i + 1 < argc) rmi_ks = parse_sizes(argv[++i]);
         else if (!std::strcmp(argv[i], "--lookups") && i + 1 < argc) num_lookups = std::strtoull(argv[++i], nullptr, 10);
         else if (!std::strcmp(argv[i], "--reps") && i + 1 < argc) reps = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--out") && i + 1 < argc) out_csv = argv[++i];
@@ -178,8 +181,14 @@ int main(int argc, char** argv) {
                      num_lookups);
     }
 
-    const DatasetKind kinds[] = {DatasetKind::Dense, DatasetKind::Lognormal,
-                                 DatasetKind::UniformSparse};
+    std::vector<DatasetKind> kinds;
+    for (DatasetKind kind : {DatasetKind::Dense, DatasetKind::Lognormal, DatasetKind::UniformSparse}) {
+        if (dataset_filter.empty() || dataset_filter == dataset_name(kind)) kinds.push_back(kind);
+    }
+    if (kinds.empty()) {
+        std::fprintf(stderr, "unknown dataset: %s\n", dataset_filter.c_str());
+        return 2;
+    }
 
     std::vector<Row> rows;
     size_t group_id = 0;

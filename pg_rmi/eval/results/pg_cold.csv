@@ -1,0 +1,13 @@
+dataset,index,lookups_after_evict,latency_us,min_us,max_us
+dense,btree,500,773.0,724.0,816.0
+dense,rmi,500,739.0,712.0,780.0
+dense,btree,5000,490.0,473.0,502.0
+dense,rmi,5000,466.0,443.0,499.0
+uniform_sparse,btree,500,821.0,784.0,844.0
+uniform_sparse,rmi,500,742.0,660.0,774.0
+uniform_sparse,btree,5000,516.0,507.0,543.0
+uniform_sparse,rmi,5000,488.0,459.0,505.0
+lognormal,btree,500,793.0,748.0,830.0
+lognormal,rmi,500,646.0,628.0,680.0
+lognormal,btree,5000,520.0,508.0,524.0
+lognormal,rmi,5000,404.0,384.0,414.0

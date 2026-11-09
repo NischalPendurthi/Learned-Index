@@ -39,6 +39,48 @@ Flags: --dataset dense|lognormal|uniform_sparse|all   --n LIST   --k LIST
 python3 plots/make_plots.py        # redraws plots/*.png from the saved CSVs
 
 
+4. PostgreSQL index (pg_rmi/)
+-----------------------------
+Uses a private cluster on port 5544 in ../pg_rmi_cluster. No sudo, and the
+system PostgreSQL is not touched.
+
+cd pg_rmi
+./cluster.sh init           # first time only
+./cluster.sh install        # build and install the extension
+./cluster.sh start          # if it isn't running
+./cluster.sh psql           # SQL prompt
+cd ..
+
+Try it (in ./cluster.sh psql):
+  CREATE EXTENSION rmi;
+  CREATE TABLE t AS SELECT (random() * 1e12)::bigint AS k FROM generate_series(1, 1000000);
+  CREATE INDEX t_k ON t USING rmi (k);          -- WITH (models = 10000, fillfactor = 90) is optional
+  ANALYZE t;
+  EXPLAIN ANALYZE SELECT * FROM t WHERE k < 100000;
+  SELECT * FROM rmi_stats('t_k');
+  INSERT INTO t SELECT (random() * 1e12)::bigint FROM generate_series(1, 200000);
+  SELECT overflow_pages, overflow_entries FROM rmi_stats('t_k');
+  REINDEX INDEX t_k;                            -- retrains
+
+Tests and evaluation. The tests drop the extension and every rmi index, so run
+the evaluation again afterwards if you need its tables.
+pg_rmi/test/run_tests.sh                        # correctness suite, about 3 minutes
+python3 pg_rmi/eval/eval.py                     # sizes, pages, drift; about 35 minutes
+python3 pg_rmi/eval/timing.py                   # fair timings, about 15 minutes
+python3 pg_rmi/eval/real_data.py PATH_TO_fb_200M_uint64
+python3 plots/make_pg_plots.py
+
+
+5. Newer C++ benchmarks
+-----------------------
+g++ -std=c++17 -O3 -march=native -o stage1_bench src/*.cpp bench/stage1_bench.cpp
+g++ -std=c++17 -O3 -march=native -o hybrid_bench src/*.cpp bench/hybrid_bench.cpp
+./stage1_bench --n 10000000 --out demo_stage1.csv
+./stage1_bench --sosd PATH_TO_fb_200M_uint64 --n 10000000 --out demo_real.csv
+./hybrid_bench --n 10000000 --out demo_hybrid.csv
+./benchmark --ks 10000,50000,100000,200000 --dataset lognormal --sizes 10000000 --out demo_k.csv   # rebuild first
+
+
 Live demo for the professor (under 20 s)
 ----------------------------------------
 ./benchmark --sizes 1000000 --lookups 200000 --reps 3 --out demo.csv

@@ -1,0 +1,13 @@
+dataset,index,rows_per_range,latency_us
+dense,btree,100,116.0
+dense,rmi,100,128.0
+dense,btree,10000,7285.0
+dense,rmi,10000,7226.0
+uniform_sparse,btree,100,128.0
+uniform_sparse,rmi,100,104.0
+uniform_sparse,btree,10000,7362.0
+uniform_sparse,rmi,10000,7325.0
+lognormal,btree,100,131.0
+lognormal,rmi,100,123.0
+lognormal,btree,10000,7515.0
+lognormal,rmi,10000,7166.0

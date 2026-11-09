@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CS631 Final Report</title>
+<style>
+  @page { size: A4; margin: 18mm 18mm 16mm; }
+  body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 9.6pt; line-height: 1.42; color: #161616; }
+  h1 { font-size: 17pt; margin: 0 0 4pt; line-height: 1.2; }
+  h2 { font-size: 12.2pt; border-bottom: 1px solid #bbb; padding-bottom: 2pt; margin: 15pt 0 6pt; break-after: avoid; }
+  h3 { font-size: 10.2pt; margin: 10pt 0 3pt; break-after: avoid; }
+  p { margin: 0 0 6pt; }
+  ul { margin: 0 0 6pt; padding-left: 15pt; }
+  li { margin-bottom: 3pt; }
+  .meta { color: #333; margin-bottom: 8pt; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; background: #f1f1f1; padding: 0 2pt; }
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0 8pt; font-size: 8.7pt; break-inside: avoid; }
+  th, td { border: 1px solid #c8c8c8; padding: 2.5pt 5pt; text-align: right; }
+  th { background: #ececec; font-weight: bold; }
+  th:first-child, td:first-child { text-align: left; }
+  td.l, th.l { text-align: left; }
+  figure { margin: 6pt 0 8pt; break-inside: avoid; }
+  img { width: 100%; }
+  figcaption { font-size: 8.3pt; color: #444; margin-top: 2pt; }
+</style>
+</head>
+<body>
+
+<h1>Learned Index Structures: from an RMI benchmark to a PostgreSQL index</h1>
+<div class="meta">CS631 course project, final report<br>
+Paper: Kraska, Beutel, Chi, Dean and Polyzotis, <i>The Case for Learned Index Structures</i>, SIGMOD 2018<br>
+Team: Nischal (23b1024) &nbsp; Rithwik (23b0939)</div>
+
+<h2>1. What changed since checkpoint 1</h2>
+<p>At the checkpoint we had a two-stage RMI and a read-only B-Tree, compared in memory. Since then we built the learned index into PostgreSQL 18 as a real index type, improved the model where it was weakest, added the paper's hybrid index, and tested on real data.</p>
+<ul>
+  <li><b>A PostgreSQL index access method</b>, used as <code>CREATE INDEX ... USING rmi (k)</code>. It answers equality and range queries, accepts inserts and deletes, works with VACUUM, retrains with <code>REINDEX</code>, and recovers after a crash.</li>
+  <li><b>A piecewise-linear stage 1</b> that fixes the lognormal weakness we reported.</li>
+  <li><b>The hybrid index</b> from Algorithm 1 of the paper.</li>
+  <li><b>A real dataset:</b> Facebook user IDs from SOSD (<code>fb_200M_uint64</code>).</li>
+</ul>
+<p>Main result, PostgreSQL 18 with 10M rows, compared with the built-in <code>btree</code>:</p>
+<table>
+  <tr><th>Measure</th><th>btree</th><th>rmi</th><th>Change</th></tr>
+  <tr><td>Index pages read per lookup</td><td>3.00</td><td>1.00 to 1.06</td><td>about 3&times; fewer</td></tr>
+  <tr><td>Index size</td><td>214 MB</td><td>150 MB</td><td>1.43&times; smaller</td></tr>
+  <tr><td>Point lookup inside the server, cached</td><td>3.2 to 3.4 &micro;s</td><td>2.4 to 2.5 &micro;s</td><td>24 to 27% less</td></tr>
+  <tr><td>Index build, one core</td><td>4.7 to 4.8 s</td><td>3.4 to 3.5 s</td><td>27 to 29% less</td></tr>
+  <tr><td>Point lookup as a full SQL statement, cached</td><td>14 to 16 &micro;s</td><td>13 to 14 &micro;s</td><td>small</td></tr>
+</table>
+<p>The checkpoint's headline numbers do not carry over. Size improves by 1.43&times;, not 262&times;, because a PostgreSQL table is not sorted by key, so the index has to store a (key, row pointer) pair for every row. The model only replaces the upper levels of the tree. The gain inside a database is fewer page accesses, and most of a SQL statement's time is spent elsewhere.</p>
+
+<h2>2. The PostgreSQL index</h2>
+<p>The extension is about 1,600 lines of C in <code>pg_rmi/</code>. It uses PostgreSQL's index access method API, so the planner, executor and VACUUM treat it like any other index.</p>
+<h3>On-disk layout</h3>
+<table>
+  <tr><th>Blocks</th><th class="l">Contents</th></tr>
+  <tr><td>0</td><td class="l">Meta page: row count, model parameters, where each section starts. Never changes after build.</td></tr>
+  <tr><td>1 to m</td><td class="l">Model pages: stage-1 knots and stage-2 models. 24 bytes per model.</td></tr>
+  <tr><td>Next L</td><td class="l">Leaf pages: sorted keys and row pointers, 14 bytes per entry, 90% full at build by default.</td></tr>
+  <tr><td>After that</td><td class="l">Overflow pages, created by inserts and chained from a leaf.</td></tr>
+</table>
+<h3>How a lookup works</h3>
+<p>Each backend loads the models into memory once, so predicting costs no page access. The model gives a position in the sorted data, and position / entries-per-leaf gives the leaf. Each leaf stores fixed low and high boundary keys. If the key is outside them, we binary search over the pages inside the model's error bounds, and widen the search if those run out. A wrong prediction therefore costs extra page reads but can never produce a wrong answer. This also covers absent keys and the start of range scans, where the error bounds alone are not enough.</p>
+<p>Three things PostgreSQL requires that the C++ version never had to handle:</p>
+<ul>
+  <li><b>Duplicate keys.</b> Models are fit on the first position of each distinct key, and leaves record when a run of equal keys crosses a page boundary.</li>
+  <li><b>Signed 64-bit keys.</b> Keys are measured from the minimum key, which handles negatives and keeps floating-point precision.</li>
+  <li><b>Data types in queries.</b> <code>WHERE k = 5</code> has an <code>int4</code> constant, so the operator family includes cross-type operators.</li>
+</ul>
+<h3>Inserts, VACUUM and recovery</h3>
+<p>Leaves never split, because the position-to-page mapping depends on that. An insert goes in sorted order into the leaf that owns the key. When the leaf is full, it goes to that leaf's overflow chain, and lookups must then read the chain too. <code>REINDEX</code> retrains and removes the chains in about 4 seconds at 12.5M rows. All page changes go through PostgreSQL's generic WAL, so they survive a crash. A scan keeps its current page pinned while it returns that page's rows, and VACUUM waits for those pins, so a scan can't return a row whose slot has been reused.</p>
+<h3>Testing</h3>
+<p>Every check compares the exact set of rows from both an index scan and a bitmap scan against a sequential scan. Tables covered dense, lognormal, uniform and negative keys, long runs of duplicates, NULLs, a single row, identical keys and an empty table, with queries on present keys, absent keys and the limits of <code>bigint</code>. We repeated the checks after inserts that overflow leaves, after deletes, updates and VACUUM, and after <code>REINDEX</code>. We also ran 275,638 concurrent read, insert and delete transactions from 16 clients with no failures, and stopped the server with an immediate shutdown right after a bulk insert. After recovery the row count matched and the checks passed.</p>
+
+<h2>3. PostgreSQL evaluation</h2>
+<p>Setup: PostgreSQL 18.6 on an i7-13620H with NVMe storage, 1 GB of shared buffers, and 10M rows in each table. Each dataset is loaded twice with the same rows in the same heap order, one table per index, and parallel index builds are off. The two indexes take turns in every round and we report medians of 3 to 5 rounds. Our first run measured btree first every time, and the machine's speed changed partway through, so we discarded those timings.</p>
+<figure><img src="plots/5_pg_summary.png"><figcaption>Figure 1. Index pages come from <code>EXPLAIN (ANALYZE, BUFFERS)</code> on Bitmap Index Scan nodes, averaged over 2,000 lookups. Latency is measured over 200,000 lookups inside a server-side loop with a cached plan.</figcaption></figure>
+<p>On real Facebook keys, sampled down to 10M, the result is the same shape: 1.06 pages per lookup against 3.00, 150 MB against 214 MB, and 2.43 &micro;s against 3.22 &micro;s. The extra 0.06 pages reflect a harder key distribution, with an average error window of 180 positions, compared with 37 on lognormal.</p>
+<h3>Starting from an empty cache</h3>
+<figure><img src="plots/6_pg_cold.png"><figcaption>Figure 2. Table and index evicted from shared buffers before each run, and direct I/O used so the OS cache cannot hide reads. Median of 5 rounds. Each lookup also reads a heap page, which costs the same for both.</figcaption></figure>
+<p>The median favours rmi in all six cases, by 4 to 22%, but on dense keys the rounds overlap, so that gap is not clear. On uniform and lognormal keys they do not overlap. The gap is smaller than the page counts suggest. We estimate a btree of this size has about 75 pages above the leaves, and they stay cached after the first few lookups, so most of the time both indexes do one leaf read and one heap read. The gap is largest on lognormal, and we do not have an explanation for that.</p>
+<h3>Range scans</h3>
+<table>
+  <tr><th>Rows per range</th><th>dense btree / rmi</th><th>uniform btree / rmi</th><th>lognormal btree / rmi</th></tr>
+  <tr><td>100</td><td>116 / 128 &micro;s</td><td>128 / 104 &micro;s</td><td>131 / 123 &micro;s</td></tr>
+  <tr><td>10,000</td><td>7,285 / 7,226 &micro;s</td><td>7,362 / 7,325 &micro;s</td><td>7,515 / 7,166 &micro;s</td></tr>
+</table>
+<p>Range scans are about the same for both, and btree wins on 100-row ranges over dense keys. This is expected, since the index descent happens once and fetching the rows from the heap dominates.</p>
+<h3>Inserts and retraining</h3>
+<figure><img src="plots/7_pg_drift.png"><figcaption>Figure 3. New lognormal keys inserted into a table of 10M rows. Lookups mix old and new keys in proportion.</figcaption></figure>
+<p>Inserts are cheap until the 10% free space in the leaves runs out. After 25% new keys the index reads 2.01 pages per lookup, with 19,130 overflow pages, and is 299 MB. A <code>REINDEX</code> taking 4.2 seconds brings it back to 1.01 pages and 187 MB. The btree stays at 3.00 pages and grows to 428 MB, so rmi still reads fewer pages even at 25%. SQL latency stayed between 12 and 17 &micro;s for both indexes throughout, which is within noise. This experiment was measured before we started alternating the indexes, so its latency panel is only a rough guide; the page counts are not affected.</p>
+<h3>Number of models</h3>
+<table>
+  <tr><th>Models</th><th>Memory per backend</th><th>Avg window</th><th>Max window</th><th>Pages per lookup</th></tr>
+  <tr><td>100</td><td>2.3 KB</td><td>1,478.5</td><td>17,056</td><td>1.593</td></tr>
+  <tr><td>1,000</td><td>23.4 KB</td><td>120.6</td><td>555</td><td>1.042</td></tr>
+  <tr><td>10,000 (default)</td><td>234 KB</td><td>37.3</td><td>80</td><td>1.012</td></tr>
+  <tr><td>100,000</td><td>2.3 MB</td><td>11.6</td><td>35</td><td>1.004</td></tr>
+  <tr><td>500,000</td><td>11.7 MB</td><td>5.0</td><td>16</td><td>1.004</td></tr>
+</table>
+<p>A leaf holds about 520 entries at build, so once the error window is well under a page, more models buy nothing. Beyond about 1,000 models at this size, extra models only cost memory. This is a clear difference from the in-memory case, where accuracy keeps paying off.</p>
+
+<h2>4. In-memory RMI improvements</h2>
+<h3>Piecewise stage 1</h3>
+<p>Stage 1 can now be a monotone piecewise-linear fit through up to 256 equal-depth points of the CDF. We proposed a small neural network at the checkpoint, but the build relies on stage 1 being monotone so that each stage-2 model owns a contiguous slice, and a neural network does not guarantee that. In this comparison both versions run in one process and take turns (100M lognormal keys, median of 7 rounds):</p>
+<table>
+  <tr><th>K</th><th>Straight-line stage 1</th><th>Avg / max window</th><th>Piecewise stage 1</th><th>Avg / max window</th><th>Time saved</th></tr>
+  <tr><td>1,000</td><td>241.3 ns</td><td>92,261 / 2,240,722</td><td>220.7 ns</td><td>537 / 35,328</td><td>9%</td></tr>
+  <tr><td>10,000</td><td>201.1 ns</td><td>90,670 / 2,222,538</td><td>146.5 ns</td><td>118 / 852</td><td>27%</td></tr>
+  <tr><td>100,000</td><td>142.9 ns</td><td>2,916 / 324,201</td><td>123.2 ns</td><td>37 / 112</td><td>14%</td></tr>
+</table>
+<p>Error shrinks by a factor of up to about 770, and the time saved is much smaller, because one cache miss costs about the same whatever the window size. The model step takes 9 to 13 ns longer than with a straight line. On uniform and dense keys the build keeps the straight line, since piecewise has to beat it by 5% to be chosen.</p>
+<h3>K sweep (100M keys)</h3>
+<table>
+  <tr><th>Dataset</th><th>B-Tree page=128</th><th>Best RMI</th><th>Speedup</th></tr>
+  <tr><td>dense</td><td>216.8 ns</td><td>K=1,000: 23.3 ns</td><td>9.3&times;</td></tr>
+  <tr><td>uniform_sparse</td><td>225.3 ns</td><td>K=200,000: 66.7 ns</td><td>3.4&times;</td></tr>
+  <tr><td>lognormal</td><td>236.6 ns</td><td>K=200,000: 123.0 ns</td><td>1.9&times;</td></tr>
+</table>
+<p>All absolute times are faster than the checkpoint's, B-Tree included (237 ns against 377 ns on lognormal). That reflects the machine's state on a different day, so only comparisons within one run are meaningful.</p>
+<h3>Hybrid index (Algorithm 1)</h3>
+<figure><img src="plots/8_hybrid.png"><figcaption>Figure 4. Models whose search window exceeds threshold t are replaced by a B-Tree with 128-key pages over the keys they own. Every configuration found all 100M keys and rejected all absent keys.</figcaption></figure>
+<p>The hybrid helps only where a model is truly bad. At K=1,000, keys in the worst model improve from 81 to 65 ns. At K=10,000 and above the piecewise stage 1 has already removed the bad models, and replacing them makes those keys slower (36 to 54 ns at K=10,000 with t=512). A low threshold is harmful: t=64 at K=10,000 replaces 9,977 of the 10,000 models, raises the average from 149 to 230 ns, and makes the index 23&times; larger. A good stage 1 removes most of the need for the hybrid.</p>
+<h3>Real data: where the learned index loses</h3>
+<p>On 100M Facebook keys in memory, the best RMI we tried takes 235 ns (K=100,000) and a B-Tree takes 219 ns, so the RMI is <b>slower</b> here. Its average error window stays in the thousands of positions even at K=100,000. Piecewise does not help on this data (254 against 235 ns at K=100,000), and its worst window is larger, at about 400,000 positions. Inside PostgreSQL the same keys still favour rmi, since an error of a few hundred positions fits within one or two pages.</p>
+
+<h2>5. Limits and what we did not do</h2>
+<ul>
+  <li>The index supports one <code>bigint</code> column. It has no <code>ORDER BY</code> support (overflow entries are not in order), no unique constraints, no index-only scans and no parallel scans. A btree does all of these.</li>
+  <li>Building holds all the entries in memory and ignores <code>maintenance_work_mem</code>. Models are loaded by each connection on its first use. Overflow pages are only reclaimed by <code>REINDEX</code>, and retraining is not automatic.</li>
+  <li>We measured at 10M rows, where a btree has height 3. A larger table would add a btree level but not a page for rmi. We did not test that, so we make no claim about it.</li>
+  <li>From the checkpoint's list we did not implement biased quaternary search or the neural-network stage 1 (see Section 4). Learned hash maps and Bloom filters were left out so we could finish the PostgreSQL work.</li>
+</ul>
+
+<h2>6. Conclusion</h2>
+<p>The learned index works as a real PostgreSQL index and is correct under the tests above. It reads a third of the index pages of a btree, is 1.43&times; smaller, and takes about a quarter less server time per lookup when everything is cached. Those gains are real but much smaller than the in-memory numbers suggest, since a database has to store row pointers and spends most of a statement's time outside the index. For it to be useful in practice it would need automatic retraining and <code>ORDER BY</code> support. On real Facebook keys in memory, a plain B-Tree beat every RMI configuration we tried.</p>
+
+</body>
+</html>

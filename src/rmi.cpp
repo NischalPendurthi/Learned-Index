@@ -55,7 +55,45 @@ struct XLog {
 
 }  // namespace
 
-void RMI::build(const u64* sorted_data, sz n, sz num_models) {
+// Equal-depth knots: roughly the same number of keys falls between each pair,
+// so the fit follows the CDF wherever the keys are dense. Returns false if the
+// keys don't give at least one segment.
+bool RMI::fit_piecewise(const u64* sorted_data, sz n, sz num_models) {
+    knot_x_.clear();
+    knot_y_.clear();
+    knot_slope_.clear();
+
+    // Each doubling of the segments adds a dependent load to every lookup, and
+    // more than a few hundred stop improving the model balance.
+    const sz segments = clampv<sz>(num_models / 4, 16, 256);
+    knot_x_.reserve(segments + 1);
+    knot_y_.reserve(segments + 1);
+
+    rep(s, 0, segments + 1) {
+        sz pos = (s == segments) ? n - 1 : SC(sz, SC(ld, s) * n / segments);
+        double x = SC(double, sorted_data[pos]);
+        // Large keys can round to the same double. Keep only strictly
+        // increasing knots so no segment has zero width.
+        if (!knot_x_.empty() && x <= knot_x_.back()) continue;
+        knot_x_.push_back(x);
+        knot_y_.push_back(SC(double, SC(ld, pos) * num_models / n));
+    }
+    if (knot_x_.size() < 2) {
+        knot_x_.clear();
+        knot_y_.clear();
+        return false;
+    }
+
+    knot_y_.back() = SC(double, num_models);
+    knot_slope_.resize(knot_x_.size());
+    rep(i, 0, knot_x_.size() - 1) {
+        knot_slope_[i] = (knot_y_[i + 1] - knot_y_[i]) / (knot_x_[i + 1] - knot_x_[i]);
+    }
+    knot_slope_.back() = 0.0;
+    return true;
+}
+
+void RMI::build(const u64* sorted_data, sz n, sz num_models, bool allow_piecewise) {
     data_ = sorted_data;
     N_ = n;
     if (num_models < 1) num_models = 1;
@@ -69,20 +107,25 @@ void RMI::build(const u64* sorted_data, sz n, sz num_models) {
         double slope, intercept;
         ld cost;
     };
-    Cand cands[2];
+    Cand cands[3];
 
     {
         Fit f = fit_range(sorted_data, 0, n, XLinear{});
         cands[0] = {Stage1Kind::Linear, f.slope * scale, f.intercept * scale, 0.0L};
         Fit g = fit_range(sorted_data, 0, n, XLog{});
         cands[1] = {Stage1Kind::LogLinear, g.slope * scale, g.intercept * scale, 0.0L};
+        // slope 1 is only a "this candidate is usable" marker, the knots hold the fit
+        bool ok = allow_piecewise && fit_piecewise(sorted_data, n, num_models);
+        cands[2] = {Stage1Kind::Piecewise, ok ? 1.0 : 0.0, 0.0, 0.0L};
     }
 
-    // Keep the candidate with the smaller sum of (keys per model)^2. Bigger
+    // Keep the candidate with the smallest sum of (keys per model)^2. Bigger
     // buckets mean bigger search windows, and they also get more queries.
+    // Piecewise costs a knot search on every lookup, so it has to be clearly
+    // better (5%) to replace a plain line.
     std::vector<u32> counts(num_models);
     int best = -1;
-    for (int c = 0; c < 2; ++c) {
+    for (int c = 0; c < 3; ++c) {
         if (!(cands[c].slope > 0.0) || !std::isfinite(cands[c].intercept)) {
             cands[c].cost = std::numeric_limits<ld>::infinity();
             continue;
@@ -98,7 +141,16 @@ void RMI::build(const u64* sorted_data, sz n, sz num_models) {
             cost += c2 * c2;
         }
         cands[c].cost = cost;
-        if (best < 0 || cost < cands[best].cost) best = c;
+        ld to_beat = (best >= 0) ? cands[best].cost : 0.0L;
+        if (cands[c].kind == Stage1Kind::Piecewise) to_beat *= 0.95L;
+        if (best < 0 || cost < to_beat) best = c;
+    }
+
+    if (best < 0 || cands[best].kind != Stage1Kind::Piecewise) {
+        // not used, so don't carry it or count it in the index size
+        knot_x_.clear();
+        knot_y_.clear();
+        knot_slope_.clear();
     }
 
     if (best < 0) {
